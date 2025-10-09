@@ -1,4 +1,4 @@
-# 🚗 PEM: Parking & Road Element Mapper
+# 🚗 PEM
 
 > 基于 PEM (Prototype-based Efficient MaskFormer) 的停车场与道路元素映射系统
 > 
