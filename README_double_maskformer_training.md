@@ -41,18 +41,15 @@ datasets/
     │   ├── train/
     │   │   ├── apo/         # Apollo数据集标注
     │   │   ├── bdd100k/     # BDD100K数据集标注
-    │   │   ├── bdd100k_0/   # BDD100K_0数据集标注
     │   │   └── vestas/      # Vestas数据集标注
     │   └── val/
     │       ├── apo/         # Apollo数据集验证集标注
     │       ├── bdd100k/     # BDD100K数据集验证集标注
-    │       ├── bdd100k_0/   # BDD100K_0数据集验证集标注
     │       └── vestas/      # Vestas数据集验证集标注
     └── leftImg8bit/
         ├── train/
         │   ├── apo/         # Apollo数据集图像
         │   ├── bdd100k/     # BDD100K数据集图像
-        │   ├── bdd100k_0/   # BDD100K_0数据集图像
         │   └── vestas/      # Vestas数据集图像
         └── val/
             ├── apo/         # Apollo数据集验证集图像
