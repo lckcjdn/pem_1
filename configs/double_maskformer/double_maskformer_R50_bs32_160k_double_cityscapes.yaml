@@ -1,0 +1,155 @@
+MODEL:
+  BACKBONE:
+    FREEZE_AT: 0
+    NAME: "build_resnet_backbone"
+  WEIGHTS: ""
+  PIXEL_MEAN: [123.675, 116.280, 103.530]
+  PIXEL_STD: [58.395, 57.120, 57.375]
+  RESNETS:
+    DEPTH: 50
+    STEM_TYPE: "basic"
+    STEM_OUT_CHANNELS: 64
+    STRIDE_IN_1X1: False
+    OUT_FEATURES: ["res2", "res3", "res4", "res5"]
+    NORM: "BN"
+    RES5_MULTI_GRID: [1, 1, 1]
+  META_ARCHITECTURE: "DoubleMaskFormer"
+  DOUBLE_MASK_FORMER:
+    # PIXEL_DECODER configuration (required for multi_scale_pixel_decoder)
+    PIXEL_DECODER:
+      NAME: "PEM_Pixel_Decoder"
+      IN_FEATURES: ["res2", "res3", "res4", "res5"]
+      PROJECT_FEATURES: ["res2"]
+      PROJECT_CHANNELS: [48]
+      CONVS_DIM: 128
+      COMMON_STRIDE: 4
+      NORM: "BN"
+      TRANSFORMER_ENC_LAYERS: 6
+      ASPP_CHANNELS: 256
+      ASPP_DILATIONS: [6, 12, 18]
+      ASPP_DROPOUT: 0.1
+      USE_DEPTHWISE_SEPARABLE_CONV: False
+    # Head 1 configuration (for Apollo dataset)
+    HEAD1:
+      NAME: "DoubleMaskFormerHead"
+      NUM_CLASSES: 15  # 根据实际类别数调整
+      MASK_DIM: 256
+      HIDDEN_DIM: 256
+      NHEADS: 8
+      DIM_FEEDFORWARD: 2048
+      PRE_NORM: True
+      ENFORCE_INPUT_PROJ: True
+      NORM: "BN"
+      TRANSFORMER_IN_FEATURE: "multi_scale_pixel_decoder"
+      CLASS_WEIGHT: 2.0
+      MASK_WEIGHT: 5.0
+      DICE_WEIGHT: 5.0
+      TRAIN_NUM_POINTS: 12544
+      NO_OBJECT_WEIGHT: 0.1
+      DEEP_SUPERVISION: True
+      DEC_LAYERS: 7
+      OVERSAMPLE_RATIO: 3.0
+      IMPORTANCE_SAMPLE_RATIO: 0.75
+      # 类别权重 - 用户可以在这里设置每个类别的权重
+      # 例如: [1.0, 2.0, 1.0, 3.0, ...] - 长度应等于num_classes
+      # 默认None表示不使用权重
+      CLASS_WEIGHTS: []
+      NUM_OBJECT_QUERIES: 100
+      DROPOUT: 0.0
+      ENC_LAYERS: 0
+    # Head 2 configuration (for Vestas dataset)
+    HEAD2:
+      NAME: "DoubleMaskFormerHead"
+      NUM_CLASSES: 9
+      MASK_DIM: 256
+      HIDDEN_DIM: 256
+      NHEADS: 8
+      DIM_FEEDFORWARD: 2048
+      PRE_NORM: True
+      ENFORCE_INPUT_PROJ: True
+      NORM: "BN"
+      TRANSFORMER_IN_FEATURE: "multi_scale_pixel_decoder"
+      CLASS_WEIGHT: 2.0
+      MASK_WEIGHT: 5.0
+      DICE_WEIGHT: 5.0
+      TRAIN_NUM_POINTS: 12544
+      NO_OBJECT_WEIGHT: 0.1
+      DEEP_SUPERVISION: True
+      DEC_LAYERS: 7
+      OVERSAMPLE_RATIO: 3.0
+      IMPORTANCE_SAMPLE_RATIO: 0.75
+      NUM_OBJECT_QUERIES: 100
+      DROPOUT: 0.0
+      ENC_LAYERS: 0
+    # Fusion configuration
+    FUSION:
+      METHOD: "weighted_sum"  # "weighted_sum", "concat", "attention"
+      HEAD1_WEIGHT: 0.5  # 两个cityscapes数据集权重可以相等
+      HEAD2_WEIGHT: 0.5
+    # Test configuration
+    TEST:
+      OBJECT_MASK_THRESHOLD: 0.8
+      OVERLAP_THRESHOLD: 0.8
+      SEM_SEG_POSTPROCESSING_BEFORE_INFERENCE: False
+      PANOPTIC_ON: False
+      INSTANCE_ON: False
+      SEMANTIC_ON: True
+    SIZE_DIVISIBILITY: 32
+
+DATASETS:
+  # 使用我们新注册的两个cityscapes格式数据集
+  TRAIN: ["cityscapes_apollo_sem_seg_train", "cityscapes_vestas_sem_seg_train"]
+  TEST: ["cityscapes_apollo_sem_seg_val", "cityscapes_vestas_sem_seg_val"]
+  PRECOMPUTED_PROPOSAL_TOPK_TEST: 1000
+
+SOLVER:
+  IMS_PER_BATCH: 3
+  BASE_LR: 0.0002  # 稍微提高学习率以加速收敛
+  MAX_ITER: 150000
+  MOMENTUM: 0.9
+  NESTEROV: True
+  WEIGHT_DECAY: 0.0001
+  OPTIMIZER: "ADAMW"
+  # 学习率调度策略
+  GAMMA: 0.1
+  STEPS: (120000, 140000)
+  # 梯度裁剪设置
+  CLIP_GRADIENTS:
+    ENABLED: True
+    CLIP_VALUE: 1.0  # 提高到更合理的值，避免过度限制梯度
+    CLIP_TYPE: "norm"  # 使用norm类型可以更好地控制梯度大小
+  # 学习率预热策略
+  WARMUP_FACTOR: 0.01
+  WARMUP_ITERS: 10000
+  WARMUP_METHOD: "linear"
+  # 检查点保存
+  CHECKPOINT_PERIOD: 5000
+  # 混合精度训练
+  AMP:
+    ENABLED: True
+  # 学习率乘数设置
+  BACKBONE_MULTIPLIER: 0.1  # 骨干网络使用较小的学习率
+  HEAD1_LR_MULTIPLIER: 1.0
+  HEAD2_LR_MULTIPLIER: 1.0
+
+
+INPUT:
+  MIN_SIZE_TRAIN: (769, 800, 864, 900, 960, 1024, 1088, 1152, 1216, 1280, 1344, 1408)
+  MAX_SIZE_TRAIN: 2048
+  MIN_SIZE_TEST: 1024
+  MAX_SIZE_TEST: 2048
+  CROP:
+    ENABLED: True
+    TYPE: "absolute"
+    SIZE: (769, 769)
+  RANDOM_FLIP: "horizontal"
+
+TEST:
+  EVAL_PERIOD: 10000  # 设置为0表示不进行定期评估，训练完成后手动评估
+
+DATALOADER:
+  NUM_WORKERS: 2
+  FILTER_EMPTY_ANNOTATIONS: False
+  SAMPLER_TRAIN: "TrainingSampler"
+
+OUTPUT_DIR: "./output/double_cityscapes_apollo_vestas"

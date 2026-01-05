@@ -117,6 +117,9 @@ class DeformLayer(nn.Module):
         self.relu = nn.ReLU()
 
     def forward(self, x):
+        # 确保输入在GPU上
+        device = next(self.dcn.parameters()).device
+        x = x.to(device)
         out = x
 
         # DCN
@@ -227,32 +230,92 @@ class PEM_Pixel_Decoder(nn.Module):
     @classmethod
     def from_config(cls, cfg, input_shape: Dict[str, ShapeSpec]):
         ret = {}
+        # 对于双分割头模型，使用DOUBLE_MASK_FORMER的配置
+        if hasattr(cfg.MODEL, 'DOUBLE_MASK_FORMER') and hasattr(cfg.MODEL.DOUBLE_MASK_FORMER, 'PIXEL_DECODER'):
+            in_features = cfg.MODEL.DOUBLE_MASK_FORMER.PIXEL_DECODER.IN_FEATURES
+            ret["conv_dim"] = cfg.MODEL.DOUBLE_MASK_FORMER.PIXEL_DECODER.CONVS_DIM
+            # 使用HEAD1的MASK_DIM作为默认值
+            ret["mask_dim"] = cfg.MODEL.DOUBLE_MASK_FORMER.HEAD1.MASK_DIM
+            ret["norm"] = cfg.MODEL.DOUBLE_MASK_FORMER.PIXEL_DECODER.NORM
+        else:
+            # 回退到原始配置路径
+            in_features = cfg.MODEL.SEM_SEG_HEAD.IN_FEATURES
+            ret["conv_dim"] = cfg.MODEL.SEM_SEG_HEAD.CONVS_DIM
+            ret["mask_dim"] = cfg.MODEL.SEM_SEG_HEAD.MASK_DIM
+            ret["norm"] = cfg.MODEL.SEM_SEG_HEAD.NORM
+        
+        # 确保input_shape不为空
         ret["input_shape"] = {
-            k: v for k, v in input_shape.items() if k in cfg.MODEL.SEM_SEG_HEAD.IN_FEATURES
+            k: v for k, v in input_shape.items() if k in in_features
         }
-        ret["conv_dim"] = cfg.MODEL.SEM_SEG_HEAD.CONVS_DIM
-        ret["mask_dim"] = cfg.MODEL.SEM_SEG_HEAD.MASK_DIM
-        ret["norm"] = cfg.MODEL.SEM_SEG_HEAD.NORM
+        
+        # 添加安全检查
+        if not ret["input_shape"]:
+            raise ValueError(f"No matching input features found. Available features: {list(input_shape.keys())}, Required features: {in_features}")
+        
         return ret
 
     def forward_features(self, features):
+        # 确保模型在GPU上运行
+        device = next(self.parameters()).device
+        
         in_features = []
         for feature, projection in zip(features.values(), self.in_projections):
+            # 确保每个特征都在GPU上
+            feature = feature.to(device)
             in_features.append(projection(feature))
 
-        conv_avg = self.conv_avg(features["res5"].mean(dim=[2, 3], keepdim=True))
+        # 确保res5特征在GPU上
+        res5_feature = features["res5"].to(device)
+        
+        # 处理batch normalization在小批量时的问题
+        # 方法1：在训练模式下，如果空间维度很小，使用全局平均池化的替代方法
+        if self.training and (res5_feature.size(2) <= 1 or res5_feature.size(3) <= 1):
+            # 使用更安全的方式计算全局特征，避免batch normalization错误
+            # 直接使用第一个空间位置的特征
+            global_feature = res5_feature[:, :, 0:1, 0:1] if res5_feature.size(2) > 0 and res5_feature.size(3) > 0 else res5_feature
+        else:
+            # 正常情况下使用平均池化
+            global_feature = res5_feature.mean(dim=[2, 3], keepdim=True)
+        
+        conv_avg = self.conv_avg(global_feature)
 
         x_32 = self.csm[0](in_features[3]) + conv_avg
+        # 再次确保x_32在GPU上
+        x_32 = x_32.to(device)
         x_32, x_up = self.dcn[0](x_32)
 
-        x_16 = self.csm[1](in_features[2]) + x_up
+        # 确保x_up和in_features[2]在GPU上
+        x_up = x_up.to(device)
+        in_features_2 = in_features[2].to(device)
+        
+        x_16 = self.csm[1](in_features_2) + x_up
+        # 再次确保x_16在GPU上
+        x_16 = x_16.to(device)
         x_16, x_up = self.dcn[1](x_16)
 
-        x_8 = self.csm[2](in_features[1]) + x_up
+        # 确保x_up和in_features[1]在GPU上
+        x_up = x_up.to(device)
+        in_features_1 = in_features[1].to(device)
+        
+        x_8 = self.csm[2](in_features_1) + x_up
+        # 再次确保x_8在GPU上
+        x_8 = x_8.to(device)
         x_8, x_up = self.dcn[2](x_8)
 
-        x_4 = self.csm[3](in_features[0]) + x_up
+        # 确保x_up和in_features[0]在GPU上
+        x_up = x_up.to(device)
+        in_features_0 = in_features[0].to(device)
+        
+        x_4 = self.csm[3](in_features_0) + x_up
 
+        # 确保x_4在GPU上
+        x_4 = x_4.to(device)
+        # 确保所有返回值都在GPU上
+        x_32 = x_32.to(device)
+        x_16 = x_16.to(device)
+        x_8 = x_8.to(device)
+        
         return self.out(x_4), None, [x_32, x_16, x_8]
 
     def forward(self, features, targets=None):

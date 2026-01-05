@@ -1,10 +1,12 @@
 _BASE_: Base-Cityscapes-SemanticSegmentation.yaml
+SOLVER:
+  MAX_ITER: 150000
 MODEL:
   META_ARCHITECTURE: "MaskFormer"
   SEM_SEG_HEAD:
     NAME: "MaskFormerHead"
     IGNORE_VALUE: 255
-    NUM_CLASSES: 24 # 道路感知：9
+    NUM_CLASSES: 16 # 道路感知：9
     LOSS_WEIGHT: 1.0
     CONVS_DIM: 128
     MASK_DIM: 256

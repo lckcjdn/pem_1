@@ -104,7 +104,7 @@ class LocalRepresentation(nn.Module):
         super().__init__()
 
         self.to_query_3x3 = nn.Conv2d(d_model, d_model, 3, groups=d_model, padding=1)
-        self.bn = nn.SyncBatchNorm(d_model)
+        self.bn = nn.BatchNorm2d(d_model)
         self.out = nn.Linear(d_model, d_model)
 
         self.d_model = d_model
@@ -174,10 +174,15 @@ class PEM_CA(nn.Module):
         sim = torch.einsum('bhnc, bhqc -> bhnq', x, q)
 
         # Apply mask to similarity scores if provided
+
         if mask is not None:
             mask = (mask.flatten(2).permute(0, 2, 1).detach() < 0.0).bool()
             mask = mask.unsqueeze(1).expand(-1, self.num_heads, -1, -1)
+            #mask = optimize_mask_operation(mask)
+            # 克隆mask以避免原地操作警告
+            mask = mask.clone()
             mask[torch.all(mask.sum(2) == mask.shape[2], dim=2)] = False
+            sim = sim.clone()
             sim.masked_fill_(mask, float('-inf'))
 
         # Find indices of most similar tokens

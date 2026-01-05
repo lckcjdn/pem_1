@@ -135,8 +135,25 @@ class HungarianMatcher(nn.Module):
                 out_mask = out_mask.float()
                 tgt_mask = tgt_mask.float()
                 # Compute the focal loss between masks
-                cost_mask = batch_sigmoid_ce_loss_jit(out_mask, tgt_mask)
-
+                #源代码
+                #cost_mask = batch_sigmoid_ce_loss_jit(out_mask, tgt_mask)
+                from torch.nn import functional as F
+                def safe_batch_sigmoid_ce_loss(inputs, targets):
+                    """安全的二元交叉熵损失"""
+                    # 数据验证
+                    if torch.any(torch.isnan(inputs)) or torch.any(torch.isnan(targets)):
+                        inputs = torch.nan_to_num(inputs, 0)
+                        targets = torch.nan_to_num(targets, 0)
+                    
+                    # 确保目标值在正确范围内
+                    targets = torch.clamp(targets, 0, 1)
+                    
+                    try:
+                        return batch_sigmoid_ce_loss_jit(inputs, targets)
+                    except Exception as e:
+                        print(f"JIT损失失败，使用标准实现: {e}")
+                        return F.binary_cross_entropy_with_logits(inputs, targets, reduction='none')
+                cost_mask = safe_batch_sigmoid_ce_loss(out_mask, tgt_mask)
                 # Compute the dice loss betwen masks
                 cost_dice = batch_dice_loss_jit(out_mask, tgt_mask)
             

@@ -1,0 +1,161 @@
+MODEL:
+  BACKBONE:
+    FREEZE_AT: 0
+    NAME: "build_resnet_backbone"
+  WEIGHTS: ""
+  PIXEL_MEAN: [123.675, 116.280, 103.530]
+  PIXEL_STD: [58.395, 57.120, 57.375]
+  RESNETS:
+    DEPTH: 50
+    STEM_TYPE: "basic"
+    STEM_OUT_CHANNELS: 64
+    STRIDE_IN_1X1: False
+    OUT_FEATURES: ["res2", "res3", "res4", "res5"]
+    NORM: "BN"
+    RES5_MULTI_GRID: [1, 1, 1]
+  META_ARCHITECTURE: "DoubleMaskFormer"
+  DOUBLE_MASK_FORMER:
+    # PIXEL_DECODER configuration (required for multi_scale_pixel_decoder)
+    PIXEL_DECODER:
+      NAME: "PEM_Pixel_Decoder"
+      IN_FEATURES: ["res2", "res3", "res4", "res5"]
+      PROJECT_FEATURES: ["res2"]
+      PROJECT_CHANNELS: [48]
+      CONVS_DIM: 128
+      COMMON_STRIDE: 4
+      NORM: "BN"
+      TRANSFORMER_ENC_LAYERS: 6
+      ASPP_CHANNELS: 256
+      ASPP_DILATIONS: [6, 12, 18]
+      ASPP_DROPOUT: 0.1
+      USE_DEPTHWISE_SEPARABLE_CONV: False
+    # Head 1 configuration (for cityscapes dataset)
+    HEAD1:
+      NAME: "DoubleMaskFormerHead"
+      NUM_CLASSES: 16  
+      MASK_DIM: 256
+      HIDDEN_DIM: 256
+      NHEADS: 8
+      DIM_FEEDFORWARD: 2048
+      PRE_NORM: True  # 与单分割头训练保持一致
+      ENFORCE_INPUT_PROJ: True  # 与单分割头训练保持一致
+      NORM: "BN"
+      TRANSFORMER_IN_FEATURE: "multi_scale_pixel_decoder"  # 与单分割头训练保持一致
+      CLASS_WEIGHT: 2.0
+      MASK_WEIGHT: 5.0
+      DICE_WEIGHT: 5.0
+      TRAIN_NUM_POINTS: 12544
+      NO_OBJECT_WEIGHT: 0.1
+      DEEP_SUPERVISION: True
+      DEC_LAYERS: 7  # 与单分割头训练保持一致
+      OVERSAMPLE_RATIO: 3.0
+      IMPORTANCE_SAMPLE_RATIO: 0.75
+      NUM_OBJECT_QUERIES: 100
+      DROPOUT: 0.0
+      ENC_LAYERS: 0
+    # Head 2 configuration (for mapillary vistas dataset)
+    HEAD2:
+      NAME: "DoubleMaskFormerHead"
+      NUM_CLASSES: 9  # 根据output_vistas配置，使用9类
+      MASK_DIM: 256
+      HIDDEN_DIM: 256
+      NHEADS: 8
+      DIM_FEEDFORWARD: 2048
+      PRE_NORM: True  # 与单分割头训练保持一致
+      ENFORCE_INPUT_PROJ: True  # 与单分割头训练保持一致
+      NORM: "BN"
+      TRANSFORMER_IN_FEATURE: "multi_scale_pixel_decoder"  # 与单分割头训练保持一致
+      CLASS_WEIGHT: 2.0
+      MASK_WEIGHT: 5.0
+      DICE_WEIGHT: 5.0
+      TRAIN_NUM_POINTS: 12544
+      NO_OBJECT_WEIGHT: 0.1
+      DEEP_SUPERVISION: True
+      DEC_LAYERS: 7  # 与单分割头训练保持一致
+      OVERSAMPLE_RATIO: 3.0
+      IMPORTANCE_SAMPLE_RATIO: 0.75
+      NUM_OBJECT_QUERIES: 100
+      DROPOUT: 0.0
+      ENC_LAYERS: 0
+    # Fusion configuration
+    FUSION:
+      METHOD: "weighted_sum"  # "weighted_sum", "concat", "attention"
+      HEAD1_WEIGHT: 0.6
+      HEAD2_WEIGHT: 0.4
+    # Test configuration
+    TEST:
+      OBJECT_MASK_THRESHOLD: 0.8
+      OVERLAP_THRESHOLD: 0.8
+      SEM_SEG_POSTPROCESSING_BEFORE_INFERENCE: False
+      PANOPTIC_ON: False
+      INSTANCE_ON: False
+      SEMANTIC_ON: True
+    SIZE_DIVISIBILITY: 32
+
+DATASETS:
+  # Using cityscapes and mapillary vistas datasets
+  # 根据单分割头配置，保持一致的数据设置
+  TRAIN: ["cityscapes_fine_sem_seg_train", "mapillary_vistas_sem_seg_train"]
+  TEST: ["cityscapes_fine_sem_seg_val", "mapillary_vistas_sem_seg_val"]
+  PRECOMPUTED_PROPOSAL_TOPK_TEST: 1000
+  PRECOMPUTED_PROPOSAL_TOPK_TRAIN: 2000
+  PROPOSAL_FILES_TEST: []
+  PROPOSAL_FILES_TRAIN: []
+
+SOLVER:
+  # 与分开训练时保持一致的参数
+  IMS_PER_BATCH: 3 
+  BASE_LR: 0.0007  
+  BASE_LR_END: 0.0
+  MAX_ITER: 150000  
+  WARMUP_FACTOR: 1.0
+  WARMUP_ITERS: 0
+  WEIGHT_DECAY: 0.05
+  OPTIMIZER: "ADAMW"
+  LR_SCHEDULER_NAME: "WarmupCosineLR"
+  BACKBONE_MULTIPLIER: 0.1
+  CLIP_GRADIENTS:
+    ENABLED: True
+    CLIP_TYPE: "full_model"
+    CLIP_VALUE: 0.01
+    NORM_TYPE: 2.0
+  AMP:
+    ENABLED: True
+  CHECKPOINT_PERIOD: 5000  # 与单分割头训练保持一致
+
+INPUT:
+  # 与单分割头训练保持一致的输入配置
+  MIN_SIZE_TRAIN: [512, 614, 716, 819, 921, 1024, 1126, 1228, 1331, 1433, 1536, 1638, 1740, 1843, 1945, 2048]
+  MIN_SIZE_TRAIN_SAMPLING: "choice"
+  MIN_SIZE_TEST: 1024
+  MAX_SIZE_TRAIN: 4096
+  MAX_SIZE_TEST: 2048
+  CROP:
+    ENABLED: True
+    TYPE: "absolute"
+    SIZE: (512, 1024)
+    SINGLE_CATEGORY_MAX_AREA: 1.0
+  COLOR_AUG_SSD: True
+  SIZE_DIVISIBILITY: -1
+  FORMAT: "RGB"
+  DATASET_MAPPER_NAME: "double_mask_former_semantic"
+  RANDOM_FLIP: "horizontal"
+
+TEST:
+  EVAL_PERIOD: 5000
+  AUG:
+    ENABLED: False
+    MIN_SIZES: [512, 768, 1024, 1280, 1536, 1792]  # 与单分割头训练保持一致
+    MAX_SIZE: 4096  # 与单分割头训练保持一致
+    FLIP: True
+
+DATALOADER:
+  # 与单分割头训练保持一致的数据加载器配置
+  ASPECT_RATIO_GROUPING: True
+  FILTER_EMPTY_ANNOTATIONS: True
+  NUM_WORKERS: 8
+  REPEAT_SQRT: True
+  REPEAT_THRESHOLD: 0.0
+  SAMPLER_TRAIN: "TrainingSampler"
+
+VERSION: 2

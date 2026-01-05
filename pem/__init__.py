@@ -20,4 +20,5 @@ from .data.dataset_mappers.mask_former_semantic_dataset_mapper import (
 
 # models
 from .maskformer_model import MaskFormer
+from .Double_maskformer import DoubleMaskFormer
 from .test_time_augmentation import SemanticSegmentorWithTTA

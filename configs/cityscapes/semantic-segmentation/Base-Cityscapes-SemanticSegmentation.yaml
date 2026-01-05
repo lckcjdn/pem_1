@@ -17,7 +17,7 @@ DATASETS:
   TRAIN: ("cityscapes_fine_sem_seg_train",)
   TEST: ("cityscapes_fine_sem_seg_val",) #
 SOLVER:
-  IMS_PER_BATCH: 12
+  IMS_PER_BATCH: 2
   BASE_LR: 0.0007
   MAX_ITER: 90000
   WARMUP_FACTOR: 1.0
@@ -57,5 +57,5 @@ TEST:
     FLIP: True
 DATALOADER:
   FILTER_EMPTY_ANNOTATIONS: True
-  NUM_WORKERS: 8
+  NUM_WORKERS: 6
 VERSION: 2

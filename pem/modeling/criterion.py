@@ -95,7 +95,7 @@ class SetCriterion(nn.Module):
     """
 
     def __init__(self, num_classes, matcher, weight_dict, eos_coef, losses,
-                 num_points, oversample_ratio, importance_sample_ratio):
+                 num_points, oversample_ratio, importance_sample_ratio, class_weights=None):
         """Create the criterion.
         Parameters:
             num_classes: number of object categories, omitting the special no-object category
@@ -103,6 +103,7 @@ class SetCriterion(nn.Module):
             weight_dict: dict containing as key the names of the losses and as values their relative weight.
             eos_coef: relative classification weight applied to the no-object category
             losses: list of all the losses to be applied. See get_loss for list of available losses.
+            class_weights: optional tensor of size (num_classes,) with weights for each class
         """
         super().__init__()
         self.num_classes = num_classes
@@ -110,8 +111,18 @@ class SetCriterion(nn.Module):
         self.weight_dict = weight_dict
         self.eos_coef = eos_coef
         self.losses = losses
+        
+        # Create empty weight with eos_coef for no-object class
         empty_weight = torch.ones(self.num_classes + 1)
         empty_weight[-1] = self.eos_coef
+        
+        # Apply class weights if provided
+        if class_weights is not None:
+            # Ensure class_weights has the correct shape
+            assert class_weights.shape[0] == num_classes, f"Class weights should have shape ({num_classes},) but got {class_weights.shape}"
+            # Apply weights to foreground classes
+            empty_weight[:-1] = class_weights
+        
         self.register_buffer("empty_weight", empty_weight)
 
         # pointwise mask loss parameters
@@ -133,6 +144,7 @@ class SetCriterion(nn.Module):
         )
         target_classes[idx] = target_classes_o
 
+        # 使用带有类别权重的交叉熵损失
         loss_ce = F.cross_entropy(src_logits.transpose(1, 2), target_classes, self.empty_weight)
         losses = {"loss_ce": loss_ce}
         return losses

@@ -1,0 +1,59 @@
+# 双分割头MaskFormer配置文件 - BDD100K和Vestas数据集
+
+# 导入基础配置
+_BASE_: "base_double_maskformer.yaml"
+
+# 模型配置 - 针对BDD100K和Vestas数据集
+MODEL:
+  DOUBLE_MASK_FORMER:
+    
+    HEAD1:
+      NUM_CLASSES: 16
+      CLASS_WEIGHT: 2.0
+      MASK_WEIGHT: 5.0
+      DICE_WEIGHT: 5.0
+    HEAD2:
+      NUM_CLASSES: 9
+      CLASS_WEIGHT: 2.0
+      MASK_WEIGHT: 5.0
+      DICE_WEIGHT: 5.0
+    # 融合配置
+    FUSION:
+      HEAD1_WEIGHT: 0.5
+      HEAD2_WEIGHT: 0.5
+
+# 优化器配置
+SOLVER:
+  IMS_PER_BATCH: 8
+  BASE_LR: 0.0007
+  WARMUP_ITERS: 5000
+  WEIGHT_DECAY: 0.05
+  GRADIENT_ACCUMULATION_STEPS: 3
+  MAX_ITER: 200000
+  CLIP_GRADIENTS:
+    CLIP_VALUE: 0.5
+  CHECKPOINT_PERIOD: 20000
+
+# 数据增强配置
+INPUT:
+  MIN_SIZE_TRAIN: [448, 512, 576, 640, 704, 768, 832, 896, 960, 1024]
+  MAX_SIZE_TRAIN: 2048
+  CROP:
+    SIZE: (512, 1024)
+
+# 数据加载器配置
+DATALOADER:
+  NUM_WORKERS: 4
+  REPEAT_SQRT: True
+
+# 测试配置
+TEST:
+  EVAL_PERIOD: 20000
+
+# 输出目录
+OUTPUT_DIR: "output/bdd100k_vestas_double_maskformer"
+
+# 数据集配置
+DATASETS:
+  TRAIN: ["cityscapes_bdd100k_sem_seg_train", "cityscapes_vestas_sem_seg_train"]
+  TEST: ["cityscapes_bdd100k_sem_seg_val", "cityscapes_vestas_sem_seg_val"]

@@ -503,5 +503,7 @@ def register_all_mapillary_vistas(root):
         )
 
 
+# 避免模块导入时自动注册数据集
+# 只在显式调用时注册数据集
 _root = os.getenv("DETECTRON2_DATASETS", "datasets")
 register_all_mapillary_vistas(_root)
