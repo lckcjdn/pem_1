@@ -1,8 +1,8 @@
 # Ignore output directory
 output/
 
-# Ignore datasets directory
-datasets/
+# Ignore root datasets directory only
+/datasets/
 
 # Python cache
 __pycache__/
